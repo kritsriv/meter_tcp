@@ -3,6 +3,7 @@ const ModbusRTU = require("modbus-serial");
 const client = new ModbusRTU();
 var fs = require('fs');
 var meters = require('./meters.json')
+const alasql = require("alasql");
 const mbsId       = 1;
 const mbsTimeout  = 2000;
 let logger = []
@@ -10,7 +11,7 @@ function byteToLong(arr) {
     return (arr[0] << 16) & 0xFFFF ||  arr[1]
 }
 //==============================================================
-async function connectClient (mbsHost, mbsPort, id)
+async function connectClient (mbsHost, mbsPort, id, name)
 {
     // close port (NOTE: important in order not to create multiple connections)
     client.close(()=>{
@@ -38,6 +39,7 @@ async function connectClient (mbsHost, mbsPort, id)
             Timestamp: new Date().toLocaleString(),
             IP: mbsHost,
             Port: mbsPort,
+            Name: name,
             ID: mbsId,
             L1L2Voltage: byteToLong(L1L2Voltage.data)/10,
             L2L3Voltage: byteToLong(L2L3Voltage.data)/10,
@@ -56,6 +58,7 @@ async function connectClient (mbsHost, mbsPort, id)
             Timestamp: new Date().toLocaleString(),
             IP: mbsHost,
             Port: mbsPort,
+            Name: name,
             ID: mbsId,
             Error: ex
         }
@@ -68,11 +71,19 @@ async function connectClient (mbsHost, mbsPort, id)
 
 async function  main() {
 
-    console.log(meters)
+    alasql.promise('SELECT * FROM CSV("meter_lists.csv", {headers:true})')
+    .then(async function (data) {
+        for (let i=0; i< data.length; i++) {
+            await connectClient(data[i].IP, data[i].Port, data[i].ID, data[i].Name);
+        }
+       
+        // console.log(data)
+    })
+   // console.log(meters)
 
-    for (let i=0; i< meters.length;i++) {
-        await connectClient(meters[i].ip, meters[i].port, meters[i].id);
-    }
+    // for (let i=0; i< meters.length;i++) {
+    //     await connectClient(meters[i].ip, meters[i].port, meters[i].id);
+    // }
 
     fs.writeFile('logger.json', JSON.stringify(logger), 'utf8', ()=>{});
 
